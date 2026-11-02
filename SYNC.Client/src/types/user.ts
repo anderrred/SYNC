@@ -1,13 +1,14 @@
-import type { User } from './user';
+export type UserRole = 'Admin' | 'Manager' | 'Employee';
 
-export type ShiftStatus = 'Scheduled' | 'InProgress' | 'Completed' | 'Cancelled';
-
-export interface Shift {
+export interface User {
     id: string;
-    assignedUserId: string;
-    assignedUser?: User; 
-    startTime: string; 
-    endTime: string;
-    status: ShiftStatus;
-    notes?: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    role: UserRole;
+}
+
+export interface LoginCredentials {
+  email: string;
+  password: string;
 }
