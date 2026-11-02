@@ -16,6 +16,11 @@ export default function Sidebar() {
       roles: ['Admin', 'Manager', 'Employee'],
     },
     {
+      label: 'Mój profil',
+      path: '/profile',
+      roles: ['Admin', 'Manager', 'Employee'],
+    },
+    {
       label: 'Pracownicy',
       path: '/employees',
       roles: ['Admin', 'Manager'],
