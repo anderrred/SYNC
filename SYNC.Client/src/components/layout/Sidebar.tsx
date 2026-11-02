@@ -8,12 +8,12 @@ export default function Sidebar() {
     {
       label: 'Dashboard',
       path: '/',
-      roles: ['Admin', 'Manager', 'Employee'],
+      roles: ['Worker', 'Coordinator', 'Admin', 'Leader'],
     },
     {
       label: 'Zmiany',
       path: '/shifts',
-      roles: ['Admin', 'Manager', 'Employee'],
+      roles: ['Worker', 'Coordinator', 'Admin', 'Leader'],
     },
     {
       label: 'Mój profil',
@@ -23,7 +23,7 @@ export default function Sidebar() {
     {
       label: 'Pracownicy',
       path: '/employees',
-      roles: ['Admin', 'Manager'],
+      roles: ['Coordinator', 'Admin'],
     },
   ];
 

@@ -19,12 +19,21 @@ const AuthContext = createContext<AuthContextType | undefined>(
   undefined,
 );
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-const [user, setUser] = useState<User | null>(() => {
-    const savedUser = localStorage.getItem('sync-user');
+function readStoredUser(): User | null {
+  const token = localStorage.getItem('token');
+  const savedUser = localStorage.getItem('sync-user');
 
-    return savedUser ? JSON.parse(savedUser) : null;
-  });
+  if (!token || !savedUser) {
+    localStorage.removeItem('token');
+    localStorage.removeItem('sync-user');
+    return null;
+  }
+
+  return JSON.parse(savedUser) as User;
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(() => readStoredUser());
 
   async function login(credentials: LoginCredentials) {
     const loggedUser = await loginApi(credentials);
@@ -36,6 +45,7 @@ const [user, setUser] = useState<User | null>(() => {
   function logout() {
     setUser(null);
     localStorage.removeItem('sync-user');
+    localStorage.removeItem('token');
   }
 
   return (
