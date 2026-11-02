@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SYNC.Api.DTOs;
@@ -33,5 +34,20 @@ public class AuthController : ControllerBase
         if (result == null) return Unauthorized("Nieprawidłowy email lub hasło.");
         
         return Ok(result);
+    }
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        
+        if (!int.TryParse(userIdClaim, out int userId))
+            return Unauthorized("Nie udało się zidentyfikować użytkownika.");
+
+        var result = await _authService.ChangePasswordAsync(userId, dto);
+        
+        if (!result.Success) return BadRequest(result.Message);
+        
+        return Ok(new { message = result.Message });
     }
 }

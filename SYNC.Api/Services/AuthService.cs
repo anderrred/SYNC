@@ -51,4 +51,20 @@ public class AuthService : IAuthService
 
         return new AuthResponseDto(token, user.Email, user.Role.ToString());
     }
+    
+    public async Task<AuthResult> ChangePasswordAsync(int userId, ChangePasswordDto dto)
+    {
+        var user = await _db.Users.FindAsync(userId);
+        if (user == null) return new AuthResult(false, "Użytkownik nie został znaleziony.");
+
+        if (!BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user.PasswordHash))
+        {
+            return new AuthResult(false, "Obecne hasło jest nieprawidłowe.");
+        }
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+        await _db.SaveChangesAsync();
+
+        return new AuthResult(true, "Hasło zostało pomyślnie zmienione.");
+    }
 }

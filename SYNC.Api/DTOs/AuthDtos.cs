@@ -14,3 +14,5 @@ public record AuthResponseDto(
     string Email, 
     string Role
 );
+
+public record ChangePasswordDto(string CurrentPassword, string NewPassword);
