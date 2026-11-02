@@ -14,6 +14,7 @@ import DashboardPage from './pages/dashboard/DashboardPage';
 import ShiftsPage from './pages/shifts/ShiftsPage';
 import EmployeesPage from './pages/employees/EmployeesPage';
 import NotFoundPage from './pages/NotFoundPage';
+import ProfilePage from './pages/profile/ProfilePage';
 
 function App() {
   return (
@@ -27,7 +28,7 @@ function App() {
               <Route path="/" element={<DashboardPage />} />
 
               <Route path="/shifts" element={<ShiftsPage />} />
-
+              <Route path="profile" element={<ProfilePage />} />  
               <Route
                 element={
                   <ProtectedRoute allowedRoles={['Admin', 'Manager']} />
