@@ -1,46 +1,56 @@
-import type { User } from '../types/user';
+import axios from 'axios';
+import axiosClient from './axiosClient';
+import type { User, UserRole } from '../types/user';
 
 export interface LoginCredentials {
     email: string;
     password: string;
 }
 
-const mockUsers: User[] = [
-    {
-        id: '1',
-        firstName: 'Admin',
-        lastName: 'SYNC',
-        email: 'admin@sync.pl',
-        role: 'Admin',
-    },
-    {
-        id: '2',
-        firstName: 'Jan',
-        lastName: 'Kowalski',
-        email: 'manager@sync.pl',
-        role: 'Manager',
-    },
-    {
-        id: '3',
-        firstName: 'Adam',
-        lastName: 'Nowak',
-        email: 'employee@sync.pl',
-        role: 'Employee',
-    },
-];
+interface AuthResponse {
+    token: string;
+    email: string;
+    role: UserRole;
+}
 
-export async function login(
-    credentials: LoginCredentials,
-): Promise<User> {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    const user = mockUsers.find(
-        (u) => u.email === credentials.email,
-    );
-
-    if (!user || credentials.password !== 'sync123') {
-        throw new Error('Nieprawidłowy email lub hasło');
+function parseJwt(token: string): Record<string, unknown> | null {
+    try {
+        return JSON.parse(atob(token.split('.')[1]));
+    } catch {
+        return null;
     }
+}
 
-    return user;
+function mapUser(data: AuthResponse): User {
+    const payload = parseJwt(data.token);
+    const id =
+        (payload?.nameid as string | undefined) ??
+        (payload?.sub as string | undefined) ??
+        (payload?.['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'] as string | undefined) ??
+        data.email;
+
+    const localPart = (data.email ?? '').split('@')[0];
+    const [firstName, ...rest] = localPart.split(/[.\-_]/);
+
+    return {
+        id: String(id),
+        firstName: firstName ? firstName.charAt(0).toUpperCase() + firstName.slice(1) : 'Użytkownik',
+        lastName: rest.join(' '),
+        email: data.email,
+        role: data.role,
+    };
+}
+
+export async function login(credentials: LoginCredentials): Promise<User> {
+    try {
+        const { data } = await axiosClient.post<AuthResponse>('/Auth/login', credentials);
+        localStorage.setItem('token', data.token);
+        return mapUser(data);
+    } catch (error) {
+        if (axios.isAxiosError(error) && error.response?.status === 401) {
+            throw new Error('Nieprawidłowy email lub hasło');
+        }
+
+        throw new Error('Nie udało się zalogować. Spróbuj ponownie.');
+    }
 }

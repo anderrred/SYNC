@@ -7,14 +7,14 @@ export const mockUsers: User[] = [
         firstName: 'Jan',
         lastName: 'Kowalski',
         email: 'jan.kowalski@sync.pl',
-        role: 'Employee'
+        role: 'Worker'
     },
     {
         id: 'user-2',
         firstName: 'Anna',
         lastName: 'Nowak',
         email: 'anna.nowak@sync.pl',
-        role: 'Manager'
+        role: 'Coordinator'
     }
 ];
 
