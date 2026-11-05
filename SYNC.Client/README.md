@@ -1,9 +1,5 @@
 # SYNC.Client
 
-Instrukcje uruchomienia całego projektu (API + baza + logowanie): **[README w katalogu nadrzędnym](../README.md)**.
-
----
-
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
