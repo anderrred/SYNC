@@ -28,7 +28,7 @@ function App() {
               <Route path="/" element={<DashboardPage />} />
 
               <Route path="/shifts" element={<ShiftsPage />} />
-              <Route path="profile" element={<ProfilePage />} />  
+              <Route path="/profile" element={<ProfilePage />} />
               <Route
                 element={
                   <ProtectedRoute allowedRoles={['Coordinator', 'Admin']} />

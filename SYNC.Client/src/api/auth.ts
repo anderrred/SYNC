@@ -11,6 +11,7 @@ interface AuthResponse {
     token: string;
     email: string;
     role: UserRole;
+    fullName?: string;
 }
 
 function parseJwt(token: string): Record<string, unknown> | null {
@@ -29,13 +30,17 @@ function mapUser(data: AuthResponse): User {
         (payload?.['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'] as string | undefined) ??
         data.email;
 
+    const fullNameParts = (data.fullName ?? '').trim().split(/\s+/).filter(Boolean);
     const localPart = (data.email ?? '').split('@')[0];
-    const [firstName, ...rest] = localPart.split(/[.\-_]/);
+    const emailParts = localPart.split(/[.\-_]/);
+    const firstFromEmail = emailParts[0]
+        ? emailParts[0].charAt(0).toUpperCase() + emailParts[0].slice(1)
+        : 'Użytkownik';
 
     return {
         id: String(id),
-        firstName: firstName ? firstName.charAt(0).toUpperCase() + firstName.slice(1) : 'Użytkownik',
-        lastName: rest.join(' '),
+        firstName: fullNameParts[0] ?? firstFromEmail,
+        lastName: fullNameParts.slice(1).join(' ') || emailParts.slice(1).join(' '),
         email: data.email,
         role: data.role,
     };
