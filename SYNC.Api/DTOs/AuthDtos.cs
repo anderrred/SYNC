@@ -12,7 +12,8 @@ public record RegisterDto(
 public record AuthResponseDto(
     string Token, 
     string Email, 
-    string Role
+    string Role,
+    string FullName
 );
 
 public record ChangePasswordDto(string CurrentPassword, string NewPassword);

@@ -5,10 +5,18 @@ import type { MonthlySummaryData } from '../../api/profile';
 export default function MonthlySummary() {
     const [summary, setSummary] = useState<MonthlySummaryData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
 
     useEffect(() => {
         getMonthlySummary()
             .then(setSummary)
+            .catch((err) => {
+                setError(
+                    err instanceof Error
+                        ? err.message
+                        : 'Nie udało się załadować podsumowania.'
+                );
+            })
             .finally(() => setLoading(false));
     }, []);
 
@@ -16,8 +24,8 @@ export default function MonthlySummary() {
         return <p>Ładowanie podsumowania...</p>;
     }
 
-    if (!summary) {
-        return <p>Nie udało się załadować podsumowania.</p>;
+    if (error || !summary) {
+        return <p className="text-red-600">{error || 'Nie udało się załadować podsumowania.'}</p>;
     }
 
     const statistics = [

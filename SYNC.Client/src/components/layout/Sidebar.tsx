@@ -1,29 +1,33 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import type { UserRole } from '../../types/user';
+
+const ALL_ROLES: UserRole[] = ['Worker', 'Coordinator', 'Admin', 'Leader'];
+const STAFF_ROLES: UserRole[] = ['Coordinator', 'Admin'];
 
 export default function Sidebar() {
   const { user } = useAuth();
 
-  const links = [
+  const links: { label: string; path: string; roles: UserRole[] }[] = [
     {
       label: 'Dashboard',
       path: '/',
-      roles: ['Worker', 'Coordinator', 'Admin', 'Leader'],
+      roles: ALL_ROLES,
     },
     {
       label: 'Zmiany',
       path: '/shifts',
-      roles: ['Worker', 'Coordinator', 'Admin', 'Leader'],
+      roles: ALL_ROLES,
     },
     {
       label: 'Mój profil',
       path: '/profile',
-      roles: ['Admin', 'Manager', 'Employee'],
+      roles: ALL_ROLES,
     },
     {
       label: 'Pracownicy',
       path: '/employees',
-      roles: ['Coordinator', 'Admin'],
+      roles: STAFF_ROLES,
     },
   ];
 

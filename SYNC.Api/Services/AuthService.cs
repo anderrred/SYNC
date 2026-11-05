@@ -49,7 +49,12 @@ public class AuthService : IAuthService
 
         var token = _tokenService.GenerateToken(user);
 
-        return new AuthResponseDto(token, user.Email, user.Role.ToString());
+        return new AuthResponseDto(
+            token,
+            user.Email ?? string.Empty,
+            user.Role.ToString(),
+            user.FullName
+        );
     }
     
     public async Task<AuthResult> ChangePasswordAsync(int userId, ChangePasswordDto dto)
@@ -60,6 +65,11 @@ public class AuthService : IAuthService
         if (!BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user.PasswordHash))
         {
             return new AuthResult(false, "Obecne hasło jest nieprawidłowe.");
+        }
+
+        if (string.IsNullOrWhiteSpace(dto.NewPassword) || dto.NewPassword.Length < 8)
+        {
+            return new AuthResult(false, "Nowe hasło musi mieć co najmniej 8 znaków.");
         }
 
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);

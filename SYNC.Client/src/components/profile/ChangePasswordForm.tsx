@@ -8,12 +8,14 @@ export default function ChangePasswordForm() {
 
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
+    const [submitting, setSubmitting] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
         setMessage('');
         setError('');
+        setSubmitting(true);
 
         try {
             await changePassword({
@@ -32,6 +34,8 @@ export default function ChangePasswordForm() {
                     ? err.message
                     : 'Wystąpił błąd podczas zmiany hasła.'
             );
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -89,9 +93,10 @@ export default function ChangePasswordForm() {
 
                 <button
                     type="submit"
-                    className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                    disabled={submitting}
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
                 >
-                    Zmień hasło
+                    {submitting ? 'Zapisywanie...' : 'Zmień hasło'}
                 </button>
             </form>
         </section>

@@ -17,4 +17,22 @@ axiosClient.interceptors.request.use((config) => {
     return config;
 });
 
+axiosClient.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        const url = error.config?.url ?? '';
+        const isLoginRequest = url.includes('/Auth/login');
+
+        if (error.response?.status === 401 && !isLoginRequest) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('sync-user');
+            if (window.location.pathname !== '/login') {
+                window.location.assign('/login');
+            }
+        }
+
+        return Promise.reject(error);
+    }
+);
+
 export default axiosClient;
