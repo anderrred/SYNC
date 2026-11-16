@@ -11,7 +11,4 @@ public class ShiftAssignment
     public User Worker { get; set; } = null!;
 
     public bool IsReplacementRequested { get; set; } = false;
-    public bool IsPresent { get; set; } = false;
-    public bool ExportedToFakturownia { get; set; } = false;
-    public decimal? ActualHoursWorked { get; set; }
 }
