@@ -71,4 +71,53 @@ public class ShiftsController : ControllerBase
         
         return Ok(new { message = result.Message });
     }
+    [HttpGet("workers")]
+    [Authorize(Roles = "Coordinator,Admin")]
+    public async Task<IActionResult> GetAllWorkers()
+    {
+        return Ok(await _shiftService.GetAllWorkersAsync());
+    }
+
+    [HttpGet("workers/stats")]
+    [Authorize(Roles = "Coordinator,Admin")]
+    public async Task<IActionResult> GetWorkersStats()
+    {
+        return Ok(await _shiftService.GetWorkersStatsAsync());
+    }
+
+    [HttpPut("workers/{id}")]
+    [Authorize(Roles = "Coordinator,Admin")]
+    public async Task<IActionResult> UpdateWorker(int id, [FromBody] UpdateWorkerDto dto)
+    {
+        var result = await _shiftService.UpdateWorkerAsync(id, dto);
+        if (!result.Success) return BadRequest(new { title = result.Message });
+        
+        return Ok(new { message = result.Message });
+    }
+
+    [HttpDelete("workers/{id}")]
+    [Authorize(Roles = "Coordinator,Admin")]
+    public async Task<IActionResult> DeleteWorker(int id)
+    {
+        var result = await _shiftService.DeleteWorkerAsync(id);
+        if (!result.Success) return BadRequest(new { title = result.Message });
+        
+        return Ok(new { message = result.Message });
+    }
+
+    [HttpPost("workers/import")]
+    [Authorize(Roles = "Coordinator,Admin")]
+    public async Task<IActionResult> ImportWorkers(IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest(new { title = "Plik jest pusty lub nie został przesłany." });
+
+        if (!file.FileName.EndsWith(".xlsx"))
+            return BadRequest(new { title = "Obsługiwany jest tylko format .xlsx" });
+
+        using var stream = file.OpenReadStream();
+        var result = await _shiftService.ImportWorkersFromExcelAsync(stream);
+        
+        return Ok(result);
+    }
 }
