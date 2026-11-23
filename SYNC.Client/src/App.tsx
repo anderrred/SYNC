@@ -8,7 +8,7 @@ import { AuthProvider } from './context/AuthContext';
 
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import AppLayout from './components/layout/AppLayout';
-
+import Coordinator from './pages/Coordinator';
 import LoginPage from './pages/auth/LoginPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import ShiftsPage from './pages/shifts/ShiftsPage';
@@ -37,6 +37,10 @@ function App() {
                 <Route
                   path="/employees"
                   element={<EmployeesPage />}
+                />
+                <Route
+                  path="/command-center"
+                  element={<Coordinator />}
                 />
               </Route>
             </Route>
