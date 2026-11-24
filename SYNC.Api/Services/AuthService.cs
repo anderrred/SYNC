@@ -24,6 +24,11 @@ public class AuthService : IAuthService
             return new AuthResult(false, "Użytkownik z tym adresem email już istnieje.");
         }
 
+        if (!Enum.IsDefined(typeof(UserRole), dto.Role))
+        {
+            return new AuthResult(false, "Nieprawidłowa rola użytkownika.");
+        }
+
         var user = new User
         {
             FullName = dto.FullName,
