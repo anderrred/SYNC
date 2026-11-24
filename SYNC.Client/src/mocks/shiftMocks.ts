@@ -14,7 +14,7 @@ export const mockUsers: User[] = [
         firstName: 'Anna',
         lastName: 'Nowak',
         email: 'anna.nowak@sync.pl',
-        role: 'Coordinator'
+        role: 'Admin'
     }
 ];
 

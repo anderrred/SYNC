@@ -3,7 +3,6 @@ namespace SYNC.Api.Entities;
 public enum UserRole
 {
     Worker,
-    Coordinator,
     Admin,
     Leader
 }

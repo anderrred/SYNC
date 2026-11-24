@@ -15,7 +15,6 @@ export default function Header() {
 
   const roleNames: Record<string, string> = {
     Admin: 'Administrator',
-    Coordinator: 'Koordynator',
     Worker: 'Pracownik',
     Leader: 'Lider',
   };

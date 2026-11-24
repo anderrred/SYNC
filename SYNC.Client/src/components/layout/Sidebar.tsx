@@ -10,8 +10,8 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import type { UserRole } from '../../types/user';
 
-const ALL_ROLES: UserRole[] = ['Worker', 'Coordinator', 'Admin', 'Leader'];
-const STAFF_ROLES: UserRole[] = ['Coordinator', 'Admin'];
+const ALL_ROLES: UserRole[] = ['Worker', 'Admin', 'Leader'];
+const STAFF_ROLES: UserRole[] = ['Admin'];
 
 interface SidebarProps {
   collapsed: boolean;
@@ -81,7 +81,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                   end={link.path === '/'}
                   title={collapsed ? link.label : undefined}
                   className={({ isActive }) =>
-                    `group flex min-h-12 items-center rounded-xl transition-all duration-200 ${
+                    `group flex min-h-12 cursor-pointer items-center rounded-xl transition-all duration-200 ${
                       collapsed
                         ? 'justify-center px-2'
                         : 'gap-3 px-4'

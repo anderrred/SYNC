@@ -13,6 +13,7 @@ import LoginPage from './pages/auth/LoginPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import ShiftsPage from './pages/shifts/ShiftsPage';
 import EmployeesPage from './pages/employees/EmployeesPage';
+import EmployeeProfilePage from './pages/employees/EmployeeProfilePage';
 import NotFoundPage from './pages/NotFoundPage';
 import ProfilePage from './pages/profile/ProfilePage';
 
@@ -31,12 +32,16 @@ function App() {
               <Route path="/profile" element={<ProfilePage />} />
               <Route
                 element={
-                  <ProtectedRoute allowedRoles={['Coordinator', 'Admin']} />
+                  <ProtectedRoute allowedRoles={['Admin']} />
                 }
               >
                 <Route
                   path="/employees"
                   element={<EmployeesPage />}
+                />
+                <Route
+                  path="/employees/:id"
+                  element={<EmployeeProfilePage />}
                 />
                 <Route
                   path="/command-center"

@@ -12,6 +12,9 @@ public interface IShiftService
     Task<OperationResult> DeleteShiftAsync(int shiftId);
     
     Task<List<WorkerListDto>> GetAllWorkersAsync();
+    Task<List<WorkerHrDto>> GetStaffAsync(int month, int year);
+    Task<WorkerHrDto?> GetStaffMemberAsync(int workerId, int month, int year);
+    Task<OperationResult> CreateWorkerAsync(CreateWorkerDto dto);
     Task<List<WorkerIndividualStatsDto>> GetWorkersStatsAsync();
     Task<ImportResultDto> ImportWorkersFromExcelAsync(Stream excelStream);
     Task<OperationResult> UpdateWorkerAsync(int workerId, UpdateWorkerDto dto);

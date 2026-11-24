@@ -78,7 +78,7 @@ Hasła do bazy, klucz JWT i hasła kont demo **nie commituj** do publicznego rep
 
 - Użytkownicy w tabeli `Users` (PostgreSQL); hasła wyłącznie jako skrót BCrypt.
 - Logowanie w UI: **email + hasło**. Brak ekranu rejestracji w React (M1).
-- Nowe konto: `POST /api/Auth/register` w Swaggerze — najpierw zaloguj się jako **Coordinator** lub **Admin**, skopiuj `token`, w Swaggerze **Authorize** → `Bearer <token>`.
+- Nowe konto: `POST /api/Auth/register` w Swaggerze — najpierw zaloguj się jako **Admin**, skopiuj `token`, w Swaggerze **Authorize** → `Bearer <token>`.
 
 ### Konta demo (testy lokalne)
 
@@ -87,7 +87,7 @@ Hasła do bazy, klucz JWT i hasła kont demo **nie commituj** do publicznego rep
 | Worker | `ss17.worker@sync.pl` | `SyncTest18` |
 | Admin | `adminglowny@sync.pl` | `Admin0990` |
 
-Po zalogowaniu Worker nie widzi zakładki **Pracownicy**; Admin/Coordinator — widzi.
+Po zalogowaniu Worker nie widzi zakładki **Pracownicy**; Admin — widzi.
 
 ## Build (weryfikacja)
 

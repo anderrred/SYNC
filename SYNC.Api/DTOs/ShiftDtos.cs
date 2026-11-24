@@ -13,6 +13,8 @@ public record CrmShiftDto(
 );
 
 public record WorkerListDto(int Id, string FullName, string Email, string PhoneNumber);
+public record WorkerHrDto(int Id, string FullName, string Email, string PhoneNumber, int ShiftsThisMonth);
+public record CreateWorkerDto(string FullName, string Email, string PhoneNumber, string Password);
 public record WorkerStatsDto(int TotalWorkers, int ActiveWorkersToday);
 public record UpdateWorkerDto(string FullName, string PhoneNumber, string Email);
 public record ImportWorkerDto(string FullName, string PhoneNumber, string Email, string Password);
