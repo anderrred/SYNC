@@ -17,10 +17,19 @@ public class ShiftService : IShiftService
 
     public async Task<OperationResult> CreateShiftPoolAsync(CreateShiftPoolDto dto, int coordinatorId)
     {
+        if (dto.Spots < 1)
+            return new OperationResult(false, "Liczba miejsc musi być większa od zera.");
+
+        var start = dto.StartTime.ToUniversalTime();
+        var end = dto.EndTime.ToUniversalTime();
+
+        if (end <= start)
+            return new OperationResult(false, "Godzina zakończenia musi być późniejsza niż godzina rozpoczęcia.");
+
         var shift = new Shift
         {
-            StartTime = dto.StartTime.ToUniversalTime(),
-            EndTime = dto.EndTime.ToUniversalTime(),
+            StartTime = start,
+            EndTime = end,
             RequiredWorkers = dto.Spots,
             Description = dto.Description,
             CoordinatorId = coordinatorId
@@ -48,6 +57,22 @@ public class ShiftService : IShiftService
             .ToListAsync();
     }
 
+    public async Task<CrmShiftDto?> GetShiftByIdAsync(int shiftId)
+    {
+        return await _db.Shifts
+            .AsNoTracking()
+            .Where(s => s.Id == shiftId)
+            .Select(s => new CrmShiftDto(
+                s.Id,
+                s.StartTime,
+                s.EndTime,
+                s.Description ?? "",
+                s.RequiredWorkers,
+                s.Assignments.Select(sa => new CrmWorkerDto(sa.Worker.Id, sa.Worker.FullName)).ToList()
+            ))
+            .FirstOrDefaultAsync();
+    }
+
     public async Task<OperationResult> AssignWorkerManuallyAsync(int shiftId, int workerId)
     {
         var shift = await _db.Shifts
@@ -56,6 +81,13 @@ public class ShiftService : IShiftService
 
         if (shift == null)
             return new OperationResult(false, "Nie znaleziono takiej zmiany.");
+
+        var worker = await _db.Users.FirstOrDefaultAsync(u => u.Id == workerId);
+        if (worker == null || worker.Role != UserRole.Worker)
+            return new OperationResult(false, "Nie znaleziono pracownika do przypisania.");
+
+        if (shift.Assignments.Count >= shift.RequiredWorkers)
+            return new OperationResult(false, "Brak wolnych miejsc na tej zmianie.");
 
         if (shift.Assignments.Any(sa => sa.WorkerId == workerId))
             return new OperationResult(false, "Ten pracownik jest już przypisany do tej zmiany!");
