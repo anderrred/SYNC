@@ -42,6 +42,17 @@ public class ShiftsController : ControllerBase
         return Ok(shifts);
     }
 
+    [HttpGet("{id:int}")]
+    [Authorize(Roles = "Coordinator,Admin")]
+    public async Task<IActionResult> GetShiftById(int id)
+    {
+        var shift = await _shiftService.GetShiftByIdAsync(id);
+        if (shift == null)
+            return NotFound(new { title = "Nie znaleziono takiej zmiany." });
+
+        return Ok(shift);
+    }
+
     [HttpPost("{shiftId}/assign/{workerId}")]
     [Authorize(Roles = "Coordinator,Admin")]
     public async Task<IActionResult> AssignWorkerManually(int shiftId, int workerId)

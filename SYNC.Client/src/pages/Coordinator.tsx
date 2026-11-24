@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   CalendarDays,
   Users,
@@ -14,19 +14,19 @@ import {
   X,
   Trash2
 } from 'lucide-react';
+import {
+  assignWorker,
+  createShiftPool,
+  deleteShift,
+  getAllShifts,
+  getWorkersForAssignment,
+  removeWorkerFromShift,
+  type ShiftPool,
+  type WorkerOption,
+} from '../api/shifts';
 
 type Tab = 'changes' | 'workers' | 'settlements';
 type ViewMode = 'grid' | 'list';
-
-interface Shift {
-  id: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  department: string;
-  assigned: number;
-  total: number;
-}
 
 interface Employee {
   id: string;
@@ -36,6 +36,20 @@ interface Employee {
   department: string;
   shiftsThisMonth: number;
 }
+
+const DEPARTMENTS = [
+  'Produkcja',
+  'Magazyn',
+  'Pakowanie',
+  'Kontrola jakości',
+  'Utrzymanie ruchu',
+];
+
+const SHIFT_TEMPLATES = [
+  { id: 'morning', name: 'Zmiana poranna', startTime: '06:00', endTime: '14:00' },
+  { id: 'afternoon', name: 'Zmiana popołudniowa', startTime: '14:00', endTime: '22:00' },
+  { id: 'night', name: 'Zmiana nocna', startTime: '22:00', endTime: '06:00' },
+];
 
 const initialEmployees: Employee[] = [
   {
@@ -72,23 +86,83 @@ const initialEmployees: Employee[] = [
   },
 ];
 
+function padMonth(value: number) {
+  return String(value).padStart(2, '0');
+}
+
+function formatShiftDate(iso: string) {
+  return new Date(iso).toLocaleDateString('pl-PL', {
+    day: '2-digit',
+    month: '2-digit',
+  });
+}
+
+function formatShiftTime(iso: string) {
+  return new Date(iso).toLocaleTimeString('pl-PL', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function isInSelectedMonth(iso: string, month: string, year: string) {
+  const date = new Date(iso);
+  return (
+    !Number.isNaN(date.getTime()) &&
+    padMonth(date.getMonth() + 1) === month &&
+    String(date.getFullYear()) === year
+  );
+}
+
+function toLocalDateValue(date: Date) {
+  return `${date.getFullYear()}-${padMonth(date.getMonth() + 1)}-${padMonth(date.getDate())}`;
+}
+
+function combineLocalDateTime(date: string, time: string) {
+  return new Date(`${date}T${time}:00`);
+}
+
+function buildShiftRange(date: string, startTime: string, endTime: string) {
+  const start = combineLocalDateTime(date, startTime);
+  let end = combineLocalDateTime(date, endTime);
+
+  if (end.getTime() <= start.getTime()) {
+    end = new Date(end.getTime() + 24 * 60 * 60 * 1000);
+  }
+
+  return { start, end };
+}
+
 export default function Coordinator() {
+  const now = new Date();
   const [activeTab, setActiveTab] = useState<Tab>('changes');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
-  const [month, setMonth] = useState('11');
-  const [year, setYear] = useState('2026');
+  const [month, setMonth] = useState(padMonth(now.getMonth() + 1));
+  const [year, setYear] = useState(String(now.getFullYear()));
 
-  const [shifts, setShifts] = useState<Shift[]>([
-    {
-      id: '1',
-      date: '22.11',
-      startTime: '14:00',
-      endTime: '22:00',
-      department: 'PRODUKCJA',
-      assigned: 1,
-      total: 3,
-    },
-  ]);
+  const [shifts, setShifts] = useState<ShiftPool[]>([]);
+  const [shiftsLoading, setShiftsLoading] = useState(true);
+  const [shiftsError, setShiftsError] = useState('');
+  const [actionMessage, setActionMessage] = useState('');
+  const [actionError, setActionError] = useState('');
+
+  const [showPoolForm, setShowPoolForm] = useState(false);
+  const [showAssignForm, setShowAssignForm] = useState(false);
+  const [selectedShift, setSelectedShift] = useState<ShiftPool | null>(null);
+  const [busyShiftId, setBusyShiftId] = useState<number | null>(null);
+
+  const [poolDate, setPoolDate] = useState(toLocalDateValue(now));
+  const [poolTemplate, setPoolTemplate] = useState(SHIFT_TEMPLATES[1].id);
+  const [poolStartTime, setPoolStartTime] = useState(SHIFT_TEMPLATES[1].startTime);
+  const [poolEndTime, setPoolEndTime] = useState(SHIFT_TEMPLATES[1].endTime);
+  const [poolDepartment, setPoolDepartment] = useState(DEPARTMENTS[0]);
+  const [poolSpots, setPoolSpots] = useState(3);
+  const [savingPool, setSavingPool] = useState(false);
+
+  const [assignShiftId, setAssignShiftId] = useState('');
+  const [assignWorkerId, setAssignWorkerId] = useState('');
+  const [workers, setWorkers] = useState<WorkerOption[]>([]);
+  const [workersLoading, setWorkersLoading] = useState(false);
+  const [assigning, setAssigning] = useState(false);
 
   const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
   const [search, setSearch] = useState('');
@@ -119,10 +193,169 @@ export default function Coordinator() {
     { value: '12', label: 'Grudzień' },
   ];
 
-  function handleDeleteShift(shiftId: string) {
-    setShifts((previous) =>
-      previous.filter((shift) => shift.id !== shiftId)
-    );
+  const loadShifts = useCallback(async () => {
+    setShiftsLoading(true);
+    setShiftsError('');
+
+    try {
+      const data = await getAllShifts();
+      setShifts(data);
+    } catch (error) {
+      setShiftsError(
+        error instanceof Error
+          ? error.message
+          : 'Nie udało się pobrać grafiku zmian.'
+      );
+    } finally {
+      setShiftsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadShifts();
+  }, [loadShifts]);
+
+  const filteredShifts = useMemo(
+    () =>
+      shifts
+        .filter((shift) => isInSelectedMonth(shift.startTime, month, year))
+        .sort(
+          (a, b) =>
+            new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+        ),
+    [shifts, month, year]
+  );
+
+  function applyTemplate(templateId: string) {
+    const template = SHIFT_TEMPLATES.find((item) => item.id === templateId);
+    setPoolTemplate(templateId);
+    if (!template) return;
+    setPoolStartTime(template.startTime);
+    setPoolEndTime(template.endTime);
+  }
+
+  function openPoolForm() {
+    setActionError('');
+    setPoolDate(toLocalDateValue(new Date()));
+    applyTemplate(SHIFT_TEMPLATES[1].id);
+    setPoolDepartment(DEPARTMENTS[0]);
+    setPoolSpots(3);
+    setShowPoolForm(true);
+  }
+
+  async function openAssignForm(shiftId?: number) {
+    setActionError('');
+    setAssignShiftId(shiftId ? String(shiftId) : '');
+    setAssignWorkerId('');
+    setShowAssignForm(true);
+    setWorkersLoading(true);
+
+    try {
+      const data = await getWorkersForAssignment();
+      setWorkers(data);
+    } catch (error) {
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : 'Nie udało się pobrać listy pracowników.'
+      );
+    } finally {
+      setWorkersLoading(false);
+    }
+  }
+
+  async function handleCreatePool(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSavingPool(true);
+    setActionError('');
+
+    try {
+      const { start, end } = buildShiftRange(poolDate, poolStartTime, poolEndTime);
+      const message = await createShiftPool({
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
+        description: poolDepartment,
+        spots: Number(poolSpots),
+      });
+      setActionMessage(message);
+      setShowPoolForm(false);
+      await loadShifts();
+    } catch (error) {
+      setActionError(
+        error instanceof Error ? error.message : 'Nie udało się utworzyć puli zmian.'
+      );
+    } finally {
+      setSavingPool(false);
+    }
+  }
+
+  async function handleAssignWorker(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!assignShiftId || !assignWorkerId) return;
+
+    setAssigning(true);
+    setActionError('');
+
+    try {
+      const shiftId = Number(assignShiftId);
+      const message = await assignWorker(shiftId, Number(assignWorkerId));
+      setActionMessage(message);
+      setShowAssignForm(false);
+      const refreshed = await getAllShifts();
+      setShifts(refreshed);
+      const updated = refreshed.find((shift) => shift.shiftId === shiftId);
+      if (updated) setSelectedShift(updated);
+    } catch (error) {
+      setActionError(
+        error instanceof Error ? error.message : 'Nie udało się przypisać pracownika.'
+      );
+    } finally {
+      setAssigning(false);
+    }
+  }
+
+  async function handleDeleteShift(shiftId: number) {
+    if (!window.confirm('Czy na pewno usunąć tę zmianę?')) return;
+
+    setBusyShiftId(shiftId);
+    setActionError('');
+
+    try {
+      const message = await deleteShift(shiftId);
+      setActionMessage(message);
+      setSelectedShift((current) =>
+        current?.shiftId === shiftId ? null : current
+      );
+      await loadShifts();
+    } catch (error) {
+      setActionError(
+        error instanceof Error ? error.message : 'Nie udało się usunąć zmiany.'
+      );
+    } finally {
+      setBusyShiftId(null);
+    }
+  }
+
+  async function handleRemoveWorker(shiftId: number, workerId: number) {
+    setBusyShiftId(shiftId);
+    setActionError('');
+
+    try {
+      const message = await removeWorkerFromShift(shiftId, workerId);
+      setActionMessage(message);
+      const refreshed = await getAllShifts();
+      setShifts(refreshed);
+      const updated = refreshed.find((shift) => shift.shiftId === shiftId);
+      setSelectedShift(updated ?? null);
+    } catch (error) {
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : 'Nie udało się usunąć pracownika ze zmiany.'
+      );
+    } finally {
+      setBusyShiftId(null);
+    }
   }
 
   function openAddForm() {
@@ -201,6 +434,7 @@ export default function Coordinator() {
         <div className="flex flex-wrap gap-3">
           <button
             type="button"
+            onClick={() => void openAssignForm()}
             className="flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white px-5 py-3 font-semibold text-slate-700 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
           >
             <UserPlus size={18} strokeWidth={1.8} />
@@ -209,12 +443,25 @@ export default function Coordinator() {
 
           <button
             type="button"
+            onClick={openPoolForm}
             className="flex items-center gap-2 rounded-xl bg-slate-800 px-5 py-3 font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-700 hover:shadow-md"
           >
             <Plus size={18} strokeWidth={2} />
             Nowa pula
           </button>
         </div>
+
+        {(actionMessage || actionError) && (
+          <div
+            className={`rounded-2xl border p-4 text-sm ${
+              actionError
+                ? 'border-red-100 bg-red-50 text-red-700'
+                : 'border-blue-100 bg-blue-50 text-blue-700'
+            }`}
+          >
+            {actionError || actionMessage}
+          </div>
+        )}
 
         {/* Panel zakładek */}
         <section className="rounded-3xl border border-white/80 bg-white/85 p-5 shadow-sm backdrop-blur-sm">
@@ -327,46 +574,65 @@ export default function Coordinator() {
                 : 'flex flex-col gap-3'
             }
           >
-            {shifts.map((shift) => (
+            {shiftsLoading && (
+              <div className="rounded-3xl border border-white/80 bg-white p-8 text-center shadow-sm">
+                <p className="text-slate-500">Ładowanie grafiku zmian...</p>
+              </div>
+            )}
+
+            {!shiftsLoading && shiftsError && (
+              <div className="rounded-3xl border border-red-100 bg-white p-8 text-center shadow-sm">
+                <p className="text-red-600">{shiftsError}</p>
+              </div>
+            )}
+
+            {!shiftsLoading &&
+              !shiftsError &&
+              filteredShifts.map((shift) => (
               <article
-                key={shift.id}
-                className="relative rounded-3xl border border-white/80 bg-white p-6 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                key={shift.shiftId}
+                className="relative cursor-pointer rounded-3xl border border-white/80 bg-white p-6 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                onClick={() => setSelectedShift(shift)}
               >
                 <button
                   type="button"
-                  onClick={() => handleDeleteShift(shift.id)}
-                  className="absolute right-4 top-4 rounded-xl p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-500"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void handleDeleteShift(shift.shiftId);
+                  }}
+                  disabled={busyShiftId === shift.shiftId}
+                  className="absolute right-4 top-4 rounded-xl p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
                   title="Usuń zmianę"
-                  aria-label={`Usuń zmianę ${shift.date}`}
+                  aria-label={`Usuń zmianę ${formatShiftDate(shift.startTime)}`}
                 >
                   <Trash2 size={20} strokeWidth={1.8} />
                 </button>
 
                 <div className="flex items-center gap-2 text-sm font-semibold text-blue-600">
                   <CalendarDays size={17} strokeWidth={1.8} />
-                  {shift.date}
+                  {formatShiftDate(shift.startTime)}
                 </div>
 
                 <div className="mt-3 flex items-center gap-3 text-2xl font-bold sm:text-3xl">
                   <Clock3 size={23} className="text-slate-400" strokeWidth={1.8} />
-                  {shift.startTime} - {shift.endTime}
+                  {formatShiftTime(shift.startTime)} - {formatShiftTime(shift.endTime)}
                 </div>
 
                 <div className="my-6 border-t border-slate-100" />
 
                 <div className="flex items-center justify-between gap-3">
                   <span className="font-semibold text-slate-500">
-                    {shift.department}
+                    {shift.description || 'Bez działu'}
                   </span>
 
                   <span className="rounded-xl bg-blue-50 px-3 py-1.5 font-bold text-blue-700">
-                    {shift.assigned} / {shift.total}
+                    {shift.assignedWorkers.length} / {shift.requiredWorkers}
                   </span>
                 </div>
               </article>
             ))}
 
-            {shifts.length === 0 && (
+            {!shiftsLoading && !shiftsError && filteredShifts.length === 0 && (
               <div className="rounded-3xl border border-white/80 bg-white p-8 text-center shadow-sm">
                 <p className="text-slate-500">
                   Brak zmian do wyświetlenia.
@@ -552,6 +818,278 @@ export default function Coordinator() {
         {/* ZAKŁADKA ROZLICZENIA - NA RAZIE PUSTA */}
         {activeTab === 'settlements' && <section />}
       </div>
+
+      {/* FORMULARZ NOWEJ PULI */}
+      {showPoolForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-3xl border border-white/80 bg-white p-6 shadow-2xl shadow-slate-900/10">
+            <div className="mb-5 flex items-center justify-between">
+              <h2 className="text-2xl font-bold">Nowa pula zmian</h2>
+              <button
+                type="button"
+                onClick={() => setShowPoolForm(false)}
+                className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreatePool} className="space-y-4">
+              <div>
+                <label className="mb-1 block font-medium">Data</label>
+                <input
+                  type="date"
+                  required
+                  value={poolDate}
+                  onChange={(event) => setPoolDate(event.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block font-medium">Szablon zmiany</label>
+                <select
+                  value={poolTemplate}
+                  onChange={(event) => applyTemplate(event.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50"
+                >
+                  {SHIFT_TEMPLATES.map((template) => (
+                    <option key={template.id} value={template.id}>
+                      {template.name} ({template.startTime}–{template.endTime})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block font-medium">Od</label>
+                  <input
+                    type="time"
+                    required
+                    value={poolStartTime}
+                    onChange={(event) => setPoolStartTime(event.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block font-medium">Do</label>
+                  <input
+                    type="time"
+                    required
+                    value={poolEndTime}
+                    onChange={(event) => setPoolEndTime(event.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block font-medium">Dział</label>
+                <select
+                  value={poolDepartment}
+                  onChange={(event) => setPoolDepartment(event.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50"
+                >
+                  {DEPARTMENTS.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block font-medium">Liczba miejsc</label>
+                <input
+                  type="number"
+                  min={1}
+                  required
+                  value={poolSpots}
+                  onChange={(event) => setPoolSpots(Number(event.target.value))}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowPoolForm(false)}
+                  className="rounded-xl border border-slate-200 bg-white px-5 py-3 font-semibold text-slate-600 transition hover:bg-slate-50/70"
+                >
+                  Anuluj
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingPool}
+                  className="rounded-xl bg-slate-800 px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-slate-700 hover:shadow-md disabled:opacity-50"
+                >
+                  {savingPool ? 'Zapisywanie...' : 'Utwórz pulę'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* FORMULARZ PRZYPISANIA */}
+      {showAssignForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-3xl border border-white/80 bg-white p-6 shadow-2xl shadow-slate-900/10">
+            <div className="mb-5 flex items-center justify-between">
+              <h2 className="text-2xl font-bold">Przypisz pracownika</h2>
+              <button
+                type="button"
+                onClick={() => setShowAssignForm(false)}
+                className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAssignWorker} className="space-y-4">
+              <div>
+                <label className="mb-1 block font-medium">Zmiana</label>
+                <select
+                  required
+                  value={assignShiftId}
+                  onChange={(event) => setAssignShiftId(event.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50"
+                >
+                  <option value="">Wybierz zmianę</option>
+                  {filteredShifts.map((shift) => (
+                    <option key={shift.shiftId} value={shift.shiftId}>
+                      {formatShiftDate(shift.startTime)} {formatShiftTime(shift.startTime)}–
+                      {formatShiftTime(shift.endTime)} ({shift.description || 'Bez działu'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block font-medium">Pracownik</label>
+                <select
+                  required
+                  value={assignWorkerId}
+                  onChange={(event) => setAssignWorkerId(event.target.value)}
+                  disabled={workersLoading}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50 disabled:opacity-60"
+                >
+                  <option value="">
+                    {workersLoading ? 'Ładowanie...' : 'Wybierz pracownika'}
+                  </option>
+                  {workers.map((worker) => (
+                    <option key={worker.id} value={worker.id}>
+                      {worker.fullName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAssignForm(false)}
+                  className="rounded-xl border border-slate-200 bg-white px-5 py-3 font-semibold text-slate-600 transition hover:bg-slate-50/70"
+                >
+                  Anuluj
+                </button>
+                <button
+                  type="submit"
+                  disabled={assigning || workersLoading}
+                  className="rounded-xl bg-slate-800 px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-slate-700 hover:shadow-md disabled:opacity-50"
+                >
+                  {assigning ? 'Przypisywanie...' : 'Przypisz'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* SZCZEGÓŁY ZMIANY */}
+      {selectedShift && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-3xl border border-white/80 bg-white p-6 shadow-2xl shadow-slate-900/10">
+            <div className="mb-5 flex items-center justify-between">
+              <h2 className="text-2xl font-bold">Szczegóły zmiany</h2>
+              <button
+                type="button"
+                onClick={() => setSelectedShift(null)}
+                className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+                <p className="text-sm text-slate-500">Termin</p>
+                <p className="font-semibold">
+                  {formatShiftDate(selectedShift.startTime)}{' '}
+                  {formatShiftTime(selectedShift.startTime)} –{' '}
+                  {formatShiftTime(selectedShift.endTime)}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-100 bg-white p-4">
+                <p className="text-sm text-slate-500">Dział</p>
+                <p className="font-semibold">{selectedShift.description || 'Bez działu'}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-100 bg-white p-4">
+                <p className="text-sm text-slate-500">Obsada</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {selectedShift.assignedWorkers.length} / {selectedShift.requiredWorkers}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5">
+              <h3 className="mb-3 font-semibold">Przypisani pracownicy</h3>
+              {selectedShift.assignedWorkers.length === 0 ? (
+                <p className="text-sm text-slate-500">Nikt nie jest jeszcze przypisany.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {selectedShift.assignedWorkers.map((worker) => (
+                    <li
+                      key={worker.workerId}
+                      className="flex items-center justify-between rounded-xl border border-slate-100 px-4 py-3"
+                    >
+                      <span className="font-medium">{worker.fullName}</span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void handleRemoveWorker(selectedShift.shiftId, worker.workerId)
+                        }
+                        disabled={busyShiftId === selectedShift.shiftId}
+                        className="text-sm font-medium text-red-600 hover:text-red-700 disabled:opacity-50"
+                      >
+                        Usuń
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="mt-5 flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => void openAssignForm(selectedShift.shiftId)}
+                className="rounded-xl bg-slate-800 px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-slate-700 hover:shadow-md"
+              >
+                Przypisz pracownika
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedShift(null)}
+                className="rounded-xl border border-slate-200 px-5 py-3 font-semibold text-slate-600 transition hover:bg-slate-50/70"
+              >
+                Zamknij
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* FORMULARZ DODAWANIA / EDYCJI */}
       {showForm && (
