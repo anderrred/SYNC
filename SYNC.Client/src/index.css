@@ -12,8 +12,14 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
 html {
   scroll-behavior: smooth;
+  scrollbar-gutter: stable;
 }
 
 body {

@@ -1,11 +1,11 @@
-
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { UserRound, ChevronDown } from 'lucide-react';
 
 export default function ProfileInfo() {
     const { user } = useAuth();
-    const [expanded, setExpanded] = useState(true);
+    // Dane użytkownika są domyślnie zwinięte i otwierają się po kliknięciu.
+    const [expanded, setExpanded] = useState(false);
 
     if (!user) {
         return <p>Nie znaleziono danych użytkownika.</p>;
@@ -16,6 +16,7 @@ export default function ProfileInfo() {
             <button
                 type="button"
                 onClick={() => setExpanded((prev) => !prev)}
+                aria-expanded={expanded}
                 className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-blue-50/50"
             >
                 <div className="flex items-center gap-3">
